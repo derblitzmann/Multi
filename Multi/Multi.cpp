@@ -190,6 +190,7 @@ void __ISR(_TIMER_3_VECTOR, ipl3) T3Handler(void)
 				 : [PC] "=m" (currentThread->pc));
 	// clear the interrupt flag
 	IFS0CLR = 1<<12;
+	WriteTimer3(0);
 	// The compiler puts EPC on the stack, we are going to have to use it. Hopefully it its
 	// stack placement doesn't change in other compiles. [12(sp)]
 	asm volatile("la $at, CSWITCH \n"
@@ -201,7 +202,7 @@ void contextSwitch()
 {
 	// save the registers we got from the interruption.
 	saveRegisters();
-	// sp must be handled specially
+	// sp must be handled specially, add 40 due to this function's allocation of the stack
 	asm volatile("addiu $at, $sp, 40 \n"
 				 "sw $at, %[sp] \n"
 				 : [sp] "=m" (currentThread->sp));
@@ -264,6 +265,7 @@ void contextSwitch()
 void startThread()
 {
 	currentThread->started = true;
+	// ensure the stack doesn't collide
 	currentThread->function();
 	// This kills the thread that dares to return.
 	// Also, gotta keep that stack clean and in its proper spot.
@@ -313,6 +315,7 @@ void threadDeath()
 		free(currentThread->saved_stack);
 	}
 	
+	WriteTimer3(0);
 	// load the registers right before returning
 	loadRegisters();
 	// Jump to the place this thread was last. And clean stack.
